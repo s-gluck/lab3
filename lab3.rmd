@@ -1,0 +1,375 @@
+---
+title: "lab3"
+author: "Stephanie Gluck"
+date: "2/3/2020"
+output: 
+  html_document: 
+    theme: cerulean
+---
+
+```{r setup, include=FALSE}
+library(devtools)
+dev_mode(T)
+library(rio)
+library(ggplot2)
+library(tidyverse)
+library(scales)
+library(fivethirtyeight)
+library(ggrepel)
+
+theme_set(theme_minimal()) 
+
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r load_data}
+
+google_trends <- google_trends
+
+tv_states <- tv_states
+
+```
+
+## Google trends data and plot
+
+Create long Google data 
+
+```{r google_data}
+
+google_d_long <- google_trends %>% 
+  pivot_longer(starts_with("hurricane_"), 
+               names_to = "hurricane", 
+               values_to = "trend") %>% 
+  mutate(hurricane = as.factor(hurricane)) %>%  
+  mutate(hurricane = recode(hurricane, "hurricane_harvey_us" = "Hurricane Harvey", 
+         "hurricane_irma_us" = "Hurricane Irma", 
+         "hurricane_maria_us" = "Hurricane Maria", 
+         "hurricane_jose_us" = "Hurricane Jose")) 
+
+levels(google_d_long$hurricane)
+
+```
+
+###  Plots
+
+Change in trends for each hurricane over time, line plot  
+
+```{r google_line_plot}
+
+ggplot(google_d_long, aes(date, trend)) +
+  geom_line(aes(color = hurricane), size = 1) + 
+  scale_color_brewer("Hurricane", 
+                    palette = "Dark2") +
+  theme(legend.position = "bottom", 
+        legend.title = element_blank()) +
+  labs(x = "Date",
+       y = "Hurricane Trend",
+       title = "Change in Trends for Each Hurricane Over Time")
+```
+
+Change in trends for each hurricane over time, solid shape plot
+
+```{r google_shape_plot}
+
+ggplot(google_d_long, aes(date, trend)) +
+  geom_ribbon(aes(ymin = 0, ymax = trend, fill = hurricane), alpha = 0.7) +
+  scale_fill_brewer("Hurricane", 
+                    palette = "Dark2") + 
+  theme(legend.position = "bottom", 
+        legend.title = element_blank()) +
+  labs(x = "Date",
+       y = "Hurricane Trend",
+       title = "Change in Trends for Each Hurricane Over Time")
+```
+
+Change in trends for each hurricane over time, continous color heat map 
+
+```{r google_heat_map}
+
+#heat map for continous color 
+ggplot(google_d_long, aes(date, hurricane, fill = trend)) + 
+  geom_tile() + 
+  scale_fill_distiller("Trend", 
+                       palette = "YlGnBu", 
+                       direction = -1) +
+  labs(x = "Date",
+       y = "Hurricane",
+       title = "Change in Trends for Each Hurricane Over Time")
+```
+
+Add reference line to plot for dates that each hurricane made landfall
+
+```{r google_plot_landfall, fig.width = 8,fig.height = 6}
+
+date <- c("August 25, 2017", "September 10, 2017", "", "September 20, 2017")
+hurricane <- c("Harvey landfall", "Irma landfall", "Jose landfall", "Maria landfall")
+
+landfall <- data.frame(date, hurricane) %>% 
+  mutate(date = lubridate::mdy(as.character(date)))
+
+head(landfall)
+str(landfall)
+
+ggplot(google_d_long, aes(date, trend)) +
+  geom_ribbon(aes(ymin = 0, ymax = trend, fill = hurricane), alpha = 0.7) +
+  geom_vline(data = landfall, 
+             mapping = aes(xintercept = date), 
+             color = "gray30", linetype = "dashed") +
+  theme_minimal(base_size = 15) +
+  scale_fill_brewer("Hurricane", 
+                    palette = "Dark2") +
+  geom_text(data = landfall, 
+            mapping = aes(x = date, y = 65, label = hurricane), 
+            size = 4, angle = 90, 
+            vjust = -0.5, hjust = 0,
+            color = "gray30") + 
+  theme(legend.position = "bottom", 
+        legend.title = element_blank()) +
+  labs(x = "Date",
+       y = "Trend",
+       title = "Change in Trends for Each Hurricane Over Time",
+       subtitle = "With Date of Landfall for Each Hurricane")
+
+```
+
+## Replicate the "National cable news networks" plot 
+
+```{r tv_data}
+
+tv_data_long <- tv_states %>% 
+  pivot_longer(-date, 
+               names_to = "state", 
+               values_to = "sentences") %>% 
+  mutate(state = as.factor(state)) %>%  
+  mutate(state = recode(state, "florida" = "Florida", 
+         "texas" = "Texas", 
+         "puerto_rico" = "Puerto Rico")) %>% 
+  mutate(state = fct_relevel(state, "Florida", "Texas", "Puerto Rico"))
+
+levels(tv_data_long$state)
+str(tv_data_long)
+```
+
+"National cable news networks" Plot 
+
+```{r tv_plot}
+#pink, fc5285
+#orange, ed723c
+#blue, 3ec1c9
+
+color_palette <- c("#fc5285", "#ed723c", "#3ec1c9")
+
+date <- c("August 25, 2017", "September 20, 2017", "October 1, 2017")
+events <- c("Harvey\nlandfall", "Maria\nlandfall", "Las Vegas\nshooting")
+
+key_dates <- data.frame(date, events) %>% 
+  mutate(date = lubridate::mdy(as.character(date)))
+
+head(key_dates)
+str(key_dates)
+
+date <- c("September 10, 2017")
+events <- c("Irma\nlandfall")
+
+irma_date <- data.frame(date, events) %>% 
+  mutate(date = lubridate::mdy(as.character(date)))
+
+ggplot(tv_data_long, aes(date, sentences)) +
+  geom_ribbon(aes(ymin = 0, ymax = sentences, fill = state)) + 
+  scale_fill_manual(values = color_palette) +
+  theme_minimal(base_size = 15) +
+  geom_vline(data = key_dates, 
+             mapping = aes(xintercept = date), 
+             color = "gray40", linetype = "dotted") +
+  theme(legend.position = "none",
+        plot.title = element_text(hjust = 0.5), 
+        axis.ticks = element_blank(), 
+        panel.border = element_blank(), 
+        panel.grid.minor = element_blank()) +
+  labs(x = "",
+       y = "Share of Sentences",
+       title = "National cable news networks") +
+  geom_label(data = key_dates, 
+            mapping = aes(x = date, y = 3.4, label = events),
+            size = 4, label.size = NA, 
+            color = "gray40") +
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1, scale = 1)) + 
+  geom_hline(yintercept = 0, color = "black") +
+  annotate("text", x = as.Date("2017-08-29"), y = 1, 
+           label = "Texas", color = "black", 
+           fontface = "bold") +
+  annotate("text", x = as.Date("2017-09-10"), y = 1.6, 
+           label = "Florida", color = "black", 
+           fontface = "bold") +
+  annotate("text", x = as.Date("2017-09-30"), y = 1.6, 
+           label = "Puerto Rico", color = "black", 
+           fontface = "bold") + 
+  geom_vline(data = irma_date, 
+             mapping = aes(xintercept = date), 
+             color = "gray40", linetype = "dotted") +
+  geom_label(data = irma_date, 
+            mapping = aes(x = date, y = 3.4, label = events),
+            size = 4, label.size = NA, 
+            color = "gray40", hjust = -.05) + 
+   scale_x_date(limits = as.Date(c("2017-08-15","2017-10-10")), 
+                breaks = as.Date(c("2017-08-15", "2017-09-01", "2017-09-15", "2017-10-01")), 
+                labels = c("Aug. 15, 2017", "Sept. 1", "Sept. 15", "Oct. 1"))
+
+```
+
+```{r load_comic_data, include = F}
+library(tidyverse)
+library(lubridate)
+library(janitor)
+
+# Get DC characters:
+comic_characters_dc <- 
+  "https://github.com/fivethirtyeight/data/raw/master/comic-characters/dc-wikia-data.csv" %>% 
+  read_csv() %>% 
+  clean_names() %>% 
+  mutate(publisher = "DC")
+
+# Get Marvel characters:
+comic_characters_marvel <- 
+  "https://github.com/fivethirtyeight/data/raw/master/comic-characters/marvel-wikia-data.csv" %>% 
+  read_csv() %>% 
+  clean_names() %>% 
+  mutate(publisher = "Marvel")
+
+# Merge two dataset and perform further data wrangling:
+comic_characters <-
+  comic_characters_dc %>% 
+  bind_rows(comic_characters_marvel) %>% 
+  separate(first_appearance, c("year2", "month"), ", ", remove = FALSE) %>%
+  mutate(
+    # If month was missing, set as January and day as 01:
+    month = ifelse(is.na(month), "01", month),
+    day = "01",
+    # Note some years missing:
+    date = ymd(paste(year, month, day, sep = "-")),
+    align = factor(
+      align, 
+      levels = c("Bad Characters", "Reformed Criminals", "Netural Characters", "Good Characters"),
+      ordered = TRUE)
+  ) %>%
+  select(publisher, everything(), -c(year2, day))
+
+rm(comic_characters_dc, comic_characters_marvel)
+
+```
+
+
+## Comic character visualization 
+
+Data tidying 
+
+```{r}
+
+Hmisc::describe(comic_characters$sex)
+
+#Will only include sex male & female as there is not enough characters in the other gender groups. 
+
+#remove NAs from sex, filter for only male and female, clean up name
+comic_d <- comic_characters %>% 
+  filter(!is.na(sex)) %>% 
+  mutate(name = str_replace(name, " \\(.*\\)", ""), 
+         sex = str_replace(sex, " .*", "")) %>% 
+  filter(sex == "Male" | sex == "Female") %>% 
+  mutate(sex = as.factor(sex))
+
+Hmisc::describe(comic_d$sex)
+
+```
+
+### Comic Plot 1 
+```{r comic_plot1}
+variable.names(comic_d)
+
+ggplot(comic_d, aes(date, fill = sex)) +
+  geom_histogram(bins = 15, 
+                 color = "white") + 
+  facet_wrap(~sex) + 
+  scale_fill_brewer(palette = "Set1") + 
+   theme(legend.position = "none", 
+         plot.margin = margin(.5, 1, 0, .5, "cm"), 
+         plot.title.position = "plot") +
+  labs(x = "",
+       y = "Number of Characters",
+       title = "New Male and Female Comic Book Characters Introduced Per Year", 
+       subtitle = "Number of characters collapsed across Marvel and DC comics") 
+
+```
+
+### Comic Plot 2 
+
+```{r comic_plot2}
+
+comic_top20 <- comic_d %>% group_by(publisher) %>% 
+  top_n(20, wt = appearances) %>% 
+  ungroup()
+
+comic_top20 %>% group_by(publisher, sex) %>% 
+  summarize(n = n()) 
+
+female_name <- comic_top20 %>% 
+  filter(sex == "Female") %>% 
+  top_n(5, wt = appearances)
+
+top5_name <- comic_top20 %>% 
+  top_n(5, wt = appearances)
+
+ggplot(comic_top20, aes(reorder(name, appearances), appearances, group = sex)) +
+  geom_point(aes(color = sex), size = 3, alpha = 0.7) +
+  coord_flip() +
+  theme(axis.text.y = element_blank(), 
+        legend.position = "bottom",
+        legend.title = element_blank(),
+        panel.grid = element_blank()) + 
+  geom_text_repel(data = female_name, aes(label = name), color = "#e41a1c") +
+  geom_text_repel(data = top5_name, aes(label = name), color = "#377eb8") + 
+  scale_color_brewer(palette = "Set1") + 
+  labs(x = "Character Name",
+       y = "Number of Appearances",
+       title = "Top 20 Appearance for Marvel and DC Characters", 
+       subtitle = "Name of top 5 appearing male and female characters printed") 
+
+```
+
+### Comic Plot 3 
+
+```{r comic_plot3}
+
+comic_align <- comic_d %>% group_by(align, sex) %>%  
+  filter(str_detect(align, "Characters")) %>%
+  summarise(n = n()) %>% 
+  ungroup() %>% 
+  mutate(n = as.numeric(n)) %>% 
+  pivot_wider(sex, names_from = align, values_from = n) %>% 
+  mutate(tot = rowSums(.[2:3])) %>% 
+  mutate(prop_bad = `Bad Characters` / tot, 
+         prop_good = `Good Characters` / tot) %>% 
+  pivot_longer(5:6, names_to = "align", values_to = "prop")
+
+str(test)
+
+variable.names(comic_align)
+str(comic_align)
+
+ggplot(comic_align, aes(x = sex, y = prop, fill = align)) +
+  geom_bar(stat = "identity") +
+  theme_minimal(base_size = 15) +
+  theme(legend.position = "bottom", 
+        legend.title = element_blank(), 
+        plot.title.position = "plot") +
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
+  scale_fill_manual(values=c("#E69F00", "gray50"), 
+                    breaks =c("prop_good", "prop_bad"),
+                    labels =c("Good Characters", "Bad Characters")) +
+  coord_flip() + 
+  labs(x = "",
+       y = "",
+       title = "Percent of Good and Bad Characters by Gender", 
+       subtitle = "Characters collapsed across Marvel and DC comics") 
+
+```
+
